@@ -182,13 +182,10 @@ def get_portfolio_summary(session: Session = Depends(get_session)):
 
 # --- Chatbot Endpoint ---
 
-import os
-from google import genai
-from google.genai import types
+from llm import LLMService
 
-# Configure Gemini
-# Note: In a real app, ensure GEMINI_API_KEY is set in environment variables
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+# Initialize LLM Service
+llm_service = LLMService()
 
 @api_router.post("/chat")
 def chat_endpoint(query: Dict[str, str] = Body(...), session: Session = Depends(get_session)):
@@ -208,27 +205,9 @@ def chat_endpoint(query: Dict[str, str] = Body(...), session: Session = Depends(
     Keep answers short, concise and helpful.
     """
     
-    if not GEMINI_API_KEY:
-        return {"response": "Gemini API Key is missing. Please add GEMINI_API_KEY to your .env file to enable the AI advisor."}
-        
     try:
-        client = genai.Client(api_key=GEMINI_API_KEY)
-        
-        grounding_tool = types.Tool(
-            google_search=types.GoogleSearch()
-        )
-
-        config = types.GenerateContentConfig(
-            tools=[grounding_tool]
-        )
-
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=f"{context}\n\nUser Question: {user_query}",
-            config=config,
-        )
-        
-        return {"response": response.text}
+        response_text = llm_service.generate_response(context, user_query)
+        return {"response": response_text}
     except Exception as e:
         return {"response": f"Error communicating with AI: {str(e)}"}
 

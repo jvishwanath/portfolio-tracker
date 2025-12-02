@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import { Modal, Button, Form, InputGroup } from 'react-bootstrap';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 const ChatWidget = ({ show, onHide }) => {
     const [messages, setMessages] = useState([]);
@@ -65,7 +67,22 @@ const ChatWidget = ({ show, onHide }) => {
                                     }`}
                                 style={{ maxWidth: '75%' }}
                             >
-                                {msg.text}
+                                {msg.sender === 'user' ? (
+                                    msg.text
+                                ) : (
+                                    <ReactMarkdown 
+                                        remarkPlugins={[remarkGfm]}
+                                        components={{
+                                            p: ({node, ...props}) => <p className="mb-2 last:mb-0" {...props} />,
+                                            ul: ({node, ...props}) => <ul className="mb-2 ps-3" {...props} />,
+                                            ol: ({node, ...props}) => <ol className="mb-2 ps-3" {...props} />,
+                                            li: ({node, ...props}) => <li className="mb-1" {...props} />,
+                                            a: ({node, ...props}) => <a className="text-decoration-underline" target="_blank" rel="noopener noreferrer" {...props} />
+                                        }}
+                                    >
+                                        {msg.text}
+                                    </ReactMarkdown>
+                                )}
                             </div>
                         </div>
                     ))}

@@ -3,7 +3,7 @@ import json
 from google import genai
 from google.genai import types
 from openai import OpenAI
-from duckduckgo_search import DDGS
+from ddgs import DDGS
 
 class LLMService:
     def __init__(self):

@@ -62,23 +62,23 @@ const HoldingsTable = ({ holdings, onSelectStock, selectedTicker, onBuy, onSell,
                 )}
             </div>
             <div className="card-body p-0">
-                <Table hover responsive className="mb-0">
+                <Table hover responsive className="mb-0 align-middle">
                     <thead className="table-light">
                         <tr>
                             {[
                                 { label: 'Asset', key: 'ticker' },
-                                { label: 'Quantity', key: 'quantity' },
-                                { label: 'Avg Cost', key: 'average_cost' },
-                                { label: 'Current Price', key: 'current_price' },
-                                { label: 'Market Value', key: 'market_value' },
+                                { label: 'Qty', key: 'quantity', className: 'd-none d-sm-table-cell' },
+                                { label: 'Avg Cost', key: 'average_cost', className: 'd-none d-md-table-cell' },
+                                { label: 'Price', key: 'current_price' },
+                                { label: 'Value', key: 'market_value', className: 'd-none d-lg-table-cell' },
                                 { label: 'Gain/Loss', key: 'gain_loss' },
-                                { label: 'Actions', key: null },
+                                { label: '', key: null },
                             ].map((col) => (
                                 <th
                                     key={col.key || col.label}
                                     onClick={col.key ? () => handleSort(col.key) : undefined}
                                     style={col.key ? { cursor: 'pointer', userSelect: 'none' } : {}}
-                                    className="text-nowrap"
+                                    className={`text-nowrap ${col.className || ''}`}
                                 >
                                     {col.label}
                                     {col.key && getSortIcon(col.key)}
@@ -95,51 +95,57 @@ const HoldingsTable = ({ holdings, onSelectStock, selectedTicker, onBuy, onSell,
                                 <td onClick={() => onSelectStock(stock.ticker)} style={{ cursor: 'pointer' }}>
                                     <div className="d-flex align-items-center">
                                         <div
-                                            className="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3"
-                                            style={{ width: '40px', height: '40px', fontSize: '14px', fontWeight: 'bold' }}
+                                            className="bg-primary bg-opacity-25 text-primary rounded-circle d-flex align-items-center justify-content-center me-2"
+                                            style={{ width: '32px', height: '32px', fontSize: '12px', fontWeight: 'bold' }}
                                         >
                                             {stock.ticker.substring(0, 2)}
                                         </div>
                                         <div>
-                                            <div className="fw-bold">{stock.ticker}</div>
-                                            <small className="text-muted">Stock</small>
+                                            <div className="fw-bold" style={{ fontSize: '0.9rem' }}>{stock.ticker}</div>
+                                            {stock.company_name && (
+                                                <small className="text-muted" style={{ fontSize: '0.7rem', lineHeight: '1' }}>
+                                                    {stock.company_name}
+                                                </small>
+                                            )}
                                         </div>
                                     </div>
                                 </td>
-                                <td className="align-middle fw-semibold">{stock.quantity}</td>
-                                <td className="align-middle">${stock.average_cost.toFixed(2)}</td>
-                                <td className="align-middle">${stock.current_price.toFixed(2)}</td>
-                                <td className="align-middle fw-bold text-primary">${stock.market_value.toFixed(2)}</td>
-                                <td className="align-middle">
+                                <td className="fw-semibold d-none d-sm-table-cell">{stock.quantity}</td>
+                                <td className="d-none d-md-table-cell">${stock.average_cost.toFixed(2)}</td>
+                                <td>${stock.current_price.toFixed(2)}</td>
+                                <td className="fw-bold text-primary d-none d-lg-table-cell">${stock.market_value.toFixed(2)}</td>
+                                <td>
                                     <Badge
                                         bg={stock.gain_loss >= 0 ? 'success' : 'danger'}
-                                        className="d-inline-flex align-items-center"
+                                        className="d-inline-flex align-items-center bg-opacity-25 text-white"
+                                        style={{ fontWeight: '500' }}
                                     >
-                                        <i className={`bi bi-arrow-${stock.gain_loss >= 0 ? 'up' : 'down'}-short me-1`}></i>
                                         {stock.gain_loss >= 0 ? '+' : ''}${Math.abs(stock.gain_loss).toFixed(2)}
                                     </Badge>
                                 </td>
-                                <td className="align-middle">
+                                <td className="text-end">
                                     <ButtonGroup size="sm">
                                         <Button
-                                            variant="outline-success"
+                                            variant="link"
+                                            className="text-success p-1"
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 onBuy(stock.ticker, stock.current_price);
                                             }}
+                                            title="Buy"
                                         >
-                                            <i className="bi bi-cart-plus me-1"></i>
-                                            Buy
+                                            <i className="bi bi-plus-circle-fill fs-5"></i>
                                         </Button>
                                         <Button
-                                            variant="outline-danger"
+                                            variant="link"
+                                            className="text-danger p-1"
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 onSell(stock.ticker, stock.current_price);
                                             }}
+                                            title="Sell"
                                         >
-                                            <i className="bi bi-cart-dash me-1"></i>
-                                            Sell
+                                            <i className="bi bi-dash-circle-fill fs-5"></i>
                                         </Button>
                                     </ButtonGroup>
                                 </td>

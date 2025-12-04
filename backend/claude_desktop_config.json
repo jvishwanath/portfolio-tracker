@@ -1,0 +1,15 @@
+{
+    "mcpServers": {
+        "portfolio-tracker": {
+            "command": "python",
+            "args": [
+                "/Users/vjanmanchi/vish-ai-learn/portfolio-tracker/backend/mcp_server.py"
+            ],
+            "env": {
+                "PORTFOLIO_API_URL": "http://localhost:8080",
+                "PORTFOLIO_USER_EMAIL": "your-email@example.com",
+                "PORTFOLIO_USER_PASSWORD": "your-password"
+            }
+        }
+    }
+}

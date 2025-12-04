@@ -43,7 +43,8 @@ gcloud run deploy portfolio-tracker \
   --memory 512Mi \
   --cpu 1 \
   --set-env-vars "GEMINI_API_KEY=your_gemini_key" \
-  --set-env-vars "DATABASE_URL=$DATABASE_URL"
+  --set-env-vars "DATABASE_URL=$DATABASE_URL" \
+  --set-env-vars "SECRET_KEY=your_generated_secret_key"
 ```
 
 ---
@@ -80,7 +81,8 @@ gcloud run deploy portfolio-tracker \
   --cpu 1 \
   --add-cloudsql-instances $INSTANCE_CONNECTION_NAME \
   --set-env-vars "GEMINI_API_KEY=your_gemini_key" \
-  --set-env-vars "DATABASE_URL=postgresql://$DB_USER:$DB_PASS@localhost/$DB_NAME?host=/cloudsql/$INSTANCE_CONNECTION_NAME"
+  --set-env-vars "DATABASE_URL=postgresql://$DB_USER:$DB_PASS@localhost/$DB_NAME?host=/cloudsql/$INSTANCE_CONNECTION_NAME" \
+  --set-env-vars "SECRET_KEY=your_generated_secret_key"
 ```
 
 ## Important Notes

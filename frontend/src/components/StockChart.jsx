@@ -52,7 +52,7 @@ const StockChart = ({ ticker, onClose }) => {
         <div className="position-relative">
             <div className="d-flex justify-content-between align-items-center mb-4">
                 <div>
-                    <h3 className="h5 fw-bold text-dark mb-1">{ticker} Performance</h3>
+                    <h3 className="h5 fw-bold mb-1">{ticker} Performance</h3>
                     {priceChange && (
                         <div className={`fw-bold ${priceChange.value >= 0 ? 'text-success' : 'text-danger'}`}>
                             {priceChange.value >= 0 ? '+' : ''}{priceChange.value.toFixed(2)} ({priceChange.value >= 0 ? '+' : ''}{priceChange.percent.toFixed(2)}%)
@@ -106,10 +106,11 @@ const StockChart = ({ ticker, onClose }) => {
                     />
                     <Tooltip
                         contentStyle={{
-                            backgroundColor: '#fff',
-                            border: '1px solid #e5e7eb',
+                            backgroundColor: document.documentElement.getAttribute('data-theme') === 'dark' ? '#1e1e1e' : '#ffffff',
+                            border: `1px solid ${document.documentElement.getAttribute('data-theme') === 'dark' ? '#333' : '#dee2e6'}`,
                             borderRadius: '8px',
-                            fontSize: '14px'
+                            fontSize: '14px',
+                            color: document.documentElement.getAttribute('data-theme') === 'dark' ? '#fff' : '#212529'
                         }}
                     />
                     <Area

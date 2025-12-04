@@ -11,7 +11,7 @@ const StockForm = ({ onTransactionAdded }) => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            await axios.post('http://localhost:8010/transactions', {
+            await axios.post('/api/transactions', {
                 ticker: ticker.toUpperCase(),
                 type,
                 quantity: parseFloat(quantity),

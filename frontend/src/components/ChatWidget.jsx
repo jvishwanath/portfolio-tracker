@@ -4,7 +4,7 @@ import { Modal, Button, Form, InputGroup } from 'react-bootstrap';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
-const ChatWidget = ({ show, onHide }) => {
+const ChatWidget = ({ show, onHide, onTransactionComplete }) => {
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState('');
     const [loading, setLoading] = useState(false);
@@ -22,6 +22,19 @@ const ChatWidget = ({ show, onHide }) => {
             const response = await axios.post('/api/chat', { query: currentInput });
             const botMsg = { text: response.data.response, sender: "bot" };
             setMessages(prev => [...prev, botMsg]);
+
+            // Check if the response indicates a transaction was completed
+            const responseText = response.data.response.toLowerCase();
+            if (responseText.includes('successfully bought') ||
+                responseText.includes('successfully sold') ||
+                responseText.includes('✅')) {
+                // Trigger portfolio refresh after a short delay
+                setTimeout(() => {
+                    if (onTransactionComplete) {
+                        onTransactionComplete();
+                    }
+                }, 500);
+            }
         } catch (error) {
             console.error("Chat error", error);
             const errorMsg = { text: "Sorry, I couldn't process that.", sender: "bot" };
@@ -62,22 +75,22 @@ const ChatWidget = ({ show, onHide }) => {
                         >
                             <div
                                 className={`px-3 py-2 rounded ${msg.sender === 'user'
-                                        ? 'bg-primary text-white'
-                                        : 'bg-light text-dark border'
+                                    ? 'bg-primary text-white'
+                                    : 'bg-light text-dark border'
                                     }`}
                                 style={{ maxWidth: '75%' }}
                             >
                                 {msg.sender === 'user' ? (
                                     msg.text
                                 ) : (
-                                    <ReactMarkdown 
+                                    <ReactMarkdown
                                         remarkPlugins={[remarkGfm]}
                                         components={{
-                                            p: ({node, ...props}) => <p className="mb-2 last:mb-0" {...props} />,
-                                            ul: ({node, ...props}) => <ul className="mb-2 ps-3" {...props} />,
-                                            ol: ({node, ...props}) => <ol className="mb-2 ps-3" {...props} />,
-                                            li: ({node, ...props}) => <li className="mb-1" {...props} />,
-                                            a: ({node, ...props}) => <a className="text-decoration-underline" target="_blank" rel="noopener noreferrer" {...props} />
+                                            p: ({ node, ...props }) => <p className="mb-2 last:mb-0" {...props} />,
+                                            ul: ({ node, ...props }) => <ul className="mb-2 ps-3" {...props} />,
+                                            ol: ({ node, ...props }) => <ol className="mb-2 ps-3" {...props} />,
+                                            li: ({ node, ...props }) => <li className="mb-1" {...props} />,
+                                            a: ({ node, ...props }) => <a className="text-decoration-underline" target="_blank" rel="noopener noreferrer" {...props} />
                                         }}
                                     >
                                         {msg.text}

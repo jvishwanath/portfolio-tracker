@@ -77,7 +77,7 @@ const MarketIndices = () => {
     }
 
     return (
-        <div className="card shadow-sm mb-4">
+        <div className="card shadow-sm h-100">
             <div className="card-body py-3">
                 <div className="d-flex justify-content-between align-items-center mb-2">
                     <h6 className="mb-0 text-muted">Market Overview</h6>
@@ -100,15 +100,15 @@ const MarketIndices = () => {
                         return (
                             <div key={symbol.ticker} className="col-6 col-md-4 col-lg-2">
                                 <div className="d-flex flex-column">
-                                    <small className="text-muted fw-semibold">{data.name}</small>
-                                    <div className="fw-bold">
+                                    <small className="text-muted fw-semibold" style={{ fontSize: '0.75rem' }}>{data.name}</small>
+                                    <div className="fw-bold" style={{ fontSize: '0.9rem' }}>
                                         {isCrypto && '$'}{formatPrice(data.price, isCrypto)}
                                     </div>
                                     {data.previousClose && (
-                                        <small className={isPositive ? 'text-success' : 'text-danger'}>
+                                        <small className={isPositive ? 'text-success' : 'text-danger'} style={{ fontSize: '0.7rem' }}>
                                             <span className="d-flex align-items-center">
-                                                {isPositive ? <TrendingUp size={12} className="me-1" /> : <TrendingDown size={12} className="me-1" />}
-                                                {isPositive ? '+' : ''}{change.value.toFixed(2)} ({isPositive ? '+' : ''}{change.percent.toFixed(2)}%)
+                                                {isPositive ? <TrendingUp size={10} className="me-1" /> : <TrendingDown size={10} className="me-1" />}
+                                                {change.percent.toFixed(2)}%
                                             </span>
                                         </small>
                                     )}

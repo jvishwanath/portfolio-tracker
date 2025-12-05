@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { ListGroup, Button, Form, InputGroup } from 'react-bootstrap';
+import { ListGroup, Button, Form } from 'react-bootstrap';
 import { Plus, Trash2, TrendingUp, TrendingDown, RefreshCw } from 'lucide-react';
+import TickerSearch from './TickerSearch';
 
 const Watchlist = ({ onSelectStock }) => {
     const [watchlist, setWatchlist] = useState([]);
@@ -9,6 +10,7 @@ const Watchlist = ({ onSelectStock }) => {
     const [loading, setLoading] = useState(false);
     const [prices, setPrices] = useState({});
     const [lastUpdated, setLastUpdated] = useState(null);
+    const [error, setError] = useState('');
 
     const fetchWatchlist = async () => {
         try {
@@ -18,6 +20,7 @@ const Watchlist = ({ onSelectStock }) => {
             response.data.forEach(item => fetchPrice(item.ticker));
         } catch (error) {
             console.error("Error fetching watchlist", error);
+            setError('Failed to load watchlist');
         }
     };
 
@@ -53,12 +56,15 @@ const Watchlist = ({ onSelectStock }) => {
         e.preventDefault();
         if (!newTicker) return;
         setLoading(true);
+        setError('');
         try {
             await axios.post('/api/watchlist', { ticker: newTicker.toUpperCase() });
             setNewTicker('');
             fetchWatchlist();
         } catch (error) {
             console.error("Error adding to watchlist", error);
+            const errorMessage = error.response?.data?.detail || 'Failed to add to watchlist';
+            setError(errorMessage);
         } finally {
             setLoading(false);
         }
@@ -66,28 +72,38 @@ const Watchlist = ({ onSelectStock }) => {
 
     const handleRemove = async (id, e) => {
         e.stopPropagation();
+        setError('');
         try {
             await axios.delete(`/api/watchlist/${id}`);
             fetchWatchlist();
         } catch (error) {
             console.error("Error removing from watchlist", error);
+            const errorMessage = error.response?.data?.detail || 'Failed to remove from watchlist';
+            setError(errorMessage);
         }
     };
 
     return (
         <div>
+            {error && (
+                <div className="alert alert-danger alert-dismissible fade show" role="alert">
+                    {error}
+                    <button type="button" className="btn-close" onClick={() => setError('')} aria-label="Close"></button>
+                </div>
+            )}
             <Form onSubmit={handleAdd} className="mb-3">
-                <InputGroup>
-                    <Form.Control
-                        type="text"
-                        placeholder="Add symbol..."
-                        value={newTicker}
-                        onChange={(e) => setNewTicker(e.target.value)}
-                    />
+                <div className="d-flex gap-2">
+                    <div className="flex-grow-1">
+                        <TickerSearch
+                            value={newTicker}
+                            onChange={setNewTicker}
+                            placeholder="Add symbol..."
+                        />
+                    </div>
                     <Button variant="outline-primary" type="submit" disabled={loading}>
                         <Plus size={18} />
                     </Button>
-                </InputGroup>
+                </div>
             </Form>
 
             <ListGroup variant="flush">
@@ -97,8 +113,7 @@ const Watchlist = ({ onSelectStock }) => {
                     </div>
                 )}
                 {watchlist.map((item) => {
-                    const data = prices[item.ticker];
-                    if (!data) return null;
+                    const data = prices[item.ticker] || { price: 0, previous_close: 0, company_name: '' };
 
                     const change = data.price - data.previous_close;
                     const changePercent = data.previous_close ? (change / data.previous_close) * 100 : 0;
@@ -122,7 +137,7 @@ const Watchlist = ({ onSelectStock }) => {
                                         </small>
                                     )}
                                 </div>
-                                {data.previous_close && (
+                                {data.price > 0 ? (
                                     <>
                                         <span className={isPositive ? 'text-success' : 'text-danger'} style={{ fontSize: '0.7rem' }}>
                                             {isPositive ? '+' : ''}${Math.abs(change).toFixed(2)}
@@ -131,9 +146,11 @@ const Watchlist = ({ onSelectStock }) => {
                                             ({isPositive ? '+' : ''}{changePercent.toFixed(2)}%)
                                         </span>
                                     </>
+                                ) : (
+                                    <span className="text-muted" style={{ fontSize: '0.7rem' }}>Loading...</span>
                                 )}
                                 <span className="fw-bold ms-auto" style={{ fontSize: '0.8rem' }}>
-                                    ${data.price.toFixed(2)}
+                                    {data.price > 0 ? `$${data.price.toFixed(2)}` : '-'}
                                 </span>
                             </div>
                             <Button

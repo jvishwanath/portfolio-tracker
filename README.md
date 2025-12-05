@@ -1,4 +1,4 @@
-# Stock Portfolio Tracker
+# NVest AI
 
 A full-stack web application for tracking stock portfolios with real-time market data, AI-powered chatbot assistant (via MCP), and comprehensive portfolio analytics.
 

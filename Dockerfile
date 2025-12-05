@@ -1,5 +1,5 @@
 # Stage 1: Build Frontend
-FROM node:18-alpine AS frontend-build
+FROM node:22-alpine AS frontend-build
 WORKDIR /app/frontend
 COPY frontend/package*.json ./
 RUN npm ci
@@ -17,6 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libffi-dev \
     && rm -rf /var/lib/apt/lists/*
 
+
 # Create virtual environment
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
@@ -28,6 +29,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Stage 3: Final Runtime
 FROM python:3.12-slim
 WORKDIR /app/backend
+
+# Install runtime dependencies (including SSL certs)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && update-ca-certificates
 
 # Copy virtual environment from builder
 COPY --from=backend-build /opt/venv /opt/venv
@@ -41,6 +49,7 @@ COPY --from=frontend-build /app/frontend/dist /app/frontend/dist
 
 # Set environment variables
 ENV PORT=8080
+ENV LOG_LEVEL=INFO
 ENV PYTHONUNBUFFERED=1
 
 # Expose port

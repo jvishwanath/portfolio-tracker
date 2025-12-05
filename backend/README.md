@@ -1,6 +1,6 @@
-# Portfolio Tracker Backend
+# NVest AI Backend
 
-This directory contains the FastAPI backend for the Portfolio Tracker application.
+This directory contains the FastAPI backend for the NVest AI application.
 
 ## Documentation
 

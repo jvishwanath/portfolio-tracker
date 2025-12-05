@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+import TickerSearch from './TickerSearch';
 import { Modal, Button, Form, ButtonGroup, InputGroup } from 'react-bootstrap';
 
 const TransactionModal = ({ show, onHide, onTransactionAdded, defaults = {} }) => {
@@ -23,7 +24,7 @@ const TransactionModal = ({ show, onHide, onTransactionAdded, defaults = {} }) =
         }
     }, [show, defaults]);
 
-    // Fetch current price when ticker changes
+    // Fetch Price Logic only (manual search removed)
     React.useEffect(() => {
         const fetchPrice = async () => {
             if (ticker && ticker.length >= 1 && ticker.length <= 5) {
@@ -34,20 +35,18 @@ const TransactionModal = ({ show, onHide, onTransactionAdded, defaults = {} }) =
                         setPrice(response.data.price.toFixed(2));
                     }
                 } catch (err) {
-                    console.error('Error fetching price:', err);
-                    // Don't show error, just keep existing price
+                    // Silent fail
                 } finally {
                     setFetchingPrice(false);
                 }
             }
         };
 
-        // Debounce the API call
         const timeoutId = setTimeout(() => {
-            if (ticker && !defaults.ticker) { // Only auto-fetch if not pre-filled
+            if (ticker && !defaults.ticker) {
                 fetchPrice();
             }
-        }, 500); // Wait 500ms after user stops typing
+        }, 500);
 
         return () => clearTimeout(timeoutId);
     }, [ticker, defaults.ticker]);
@@ -70,7 +69,8 @@ const TransactionModal = ({ show, onHide, onTransactionAdded, defaults = {} }) =
             setPrice('');
         } catch (err) {
             console.error("Error adding transaction", err);
-            setError('Failed to add transaction');
+            const errorMessage = err.response?.data?.detail || 'Failed to add transaction';
+            setError(errorMessage);
         } finally {
             setLoading(false);
         }
@@ -110,12 +110,11 @@ const TransactionModal = ({ show, onHide, onTransactionAdded, defaults = {} }) =
                     {/* Ticker */}
                     <Form.Group className="mb-3">
                         <Form.Label>Stock Symbol</Form.Label>
-                        <Form.Control
-                            type="text"
-                            placeholder="e.g. AAPL"
+                        <TickerSearch
                             value={ticker}
-                            onChange={(e) => setTicker(e.target.value)}
+                            onChange={setTicker}
                             required
+                            placeholder="e.g. AAPL or Apple"
                         />
                     </Form.Group>
 

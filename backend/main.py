@@ -1,9 +1,9 @@
-from fastapi import FastAPI, HTTPException, Depends, Body, APIRouter, status, Header
+from fastapi import FastAPI, HTTPException, Depends, Body, APIRouter, status, Header, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
-from sqlmodel import Session, select
-from database import create_db_and_tables, engine
-from models import Transaction, Watchlist, User
+from sqlmodel import Session, select, delete
+from database import create_db_and_tables, engine, get_session
+from models import Transaction, Watchlist, User, CashTransaction
 import yfinance as yf
 from typing import List, Dict
 from dotenv import load_dotenv
@@ -19,8 +19,18 @@ from auth import (
 )
 from datetime import timedelta
 import os
+import requests
 
 load_dotenv()
+
+# Configure Logging
+import logging
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+logging.basicConfig(
+    level=getattr(logging, LOG_LEVEL, logging.INFO),
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
@@ -43,10 +53,6 @@ app.add_middleware(
 @app.on_event("startup")
 def on_startup():
     create_db_and_tables()
-
-def get_session():
-    with Session(engine) as session:
-        yield session
 
 # --- Auth Endpoints ---
 
@@ -174,6 +180,20 @@ def add_to_watchlist(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
+    # Check if ticker already exists in user's watchlist
+    existing = session.exec(
+        select(Watchlist)
+        .where(Watchlist.user_id == current_user.id)
+        .where(Watchlist.ticker == item.ticker.upper())
+    ).first()
+    
+    if existing:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"{item.ticker.upper()} is already in your watchlist"
+        )
+    
+    item.ticker = item.ticker.upper()
     item.user_id = current_user.id
     session.add(item)
     session.commit()
@@ -216,6 +236,42 @@ def add_transaction(
             transaction.date = datetime.fromisoformat(transaction.date.replace('Z', '+00:00'))
         except ValueError:
             pass
+    
+    # Paper trading: Check cash balance and update
+    if current_user.paper_trading_enabled:
+        transaction_value = transaction.quantity * transaction.price
+        
+        if transaction.type == "buy":
+            # Check if user has enough cash
+            if current_user.cash_balance < transaction_value:
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Insufficient cash balance. Available: ${current_user.cash_balance:.2f}, Required: ${transaction_value:.2f}"
+                )
+            # Deduct cash
+            current_user.cash_balance -= transaction_value
+            
+        elif transaction.type == "sell":
+            # Check if user has enough shares to sell
+            # Calculate current quantity for this ticker
+            txs = session.exec(
+                select(Transaction)
+                .where(Transaction.user_id == current_user.id)
+                .where(Transaction.ticker == transaction.ticker)
+            ).all()
+            
+            current_qty = sum([t.quantity if t.type == "buy" else -t.quantity for t in txs])
+            
+            if current_qty < transaction.quantity:
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Insufficient shares. Owned: {current_qty}, Selling: {transaction.quantity}"
+                )
+
+            # Add cash from sale
+            current_user.cash_balance += transaction_value
+        
+        session.add(current_user)
             
     transaction.user_id = current_user.id
     session.add(transaction)
@@ -223,7 +279,168 @@ def add_transaction(
     session.refresh(transaction)
     return transaction
 
+
+# --- Paper Trading Endpoints ---
+
+@api_router.post("/paper-trading/enable")
+def enable_paper_trading(
+    initial_deposit: float = Query(default=10000.0),
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Enable paper trading for user with initial deposit"""
+    if current_user.paper_trading_enabled:
+        raise HTTPException(status_code=400, detail="Paper trading already enabled")
+    
+    # Wipe existing data to start fresh
+    session.exec(delete(Transaction).where(Transaction.user_id == current_user.id))
+    session.exec(delete(CashTransaction).where(CashTransaction.user_id == current_user.id))
+    
+    current_user.paper_trading_enabled = True
+    current_user.cash_balance = initial_deposit
+    current_user.total_deposited = initial_deposit
+    current_user.total_withdrawn = 0.0
+    
+    # Record initial deposit
+    cash_txn = CashTransaction(
+        type="deposit",
+        amount=initial_deposit,
+        note="Initial paper trading deposit",
+        user_id=current_user.id
+    )
+    
+    session.add(current_user)
+    session.add(cash_txn)
+    session.commit()
+    session.refresh(current_user)
+    
+    return {
+        "message": "Paper trading enabled",
+        "cash_balance": current_user.cash_balance,
+        "initial_deposit": initial_deposit
+    }
+
+@api_router.get("/paper-trading/status")
+def get_paper_trading_status(
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Get paper trading status and balance"""
+    return {
+        "enabled": current_user.paper_trading_enabled,
+        "cash_balance": current_user.cash_balance,
+        "total_deposited": current_user.total_deposited,
+        "total_withdrawn": current_user.total_withdrawn
+    }
+
+@api_router.post("/paper-trading/cash")
+def manage_cash(
+    transaction_type: str = Query(...),  # "deposit" or "withdrawal"
+    amount: float = Query(...),
+    note: str = Query(default=""),
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Deposit or withdraw cash from paper trading account"""
+    if not current_user.paper_trading_enabled:
+        raise HTTPException(status_code=400, detail="Paper trading not enabled")
+    
+    if amount <= 0:
+        raise HTTPException(status_code=400, detail="Amount must be positive")
+    
+    if transaction_type == "deposit":
+        current_user.cash_balance += amount
+        current_user.total_deposited += amount
+    elif transaction_type == "withdrawal":
+        if current_user.cash_balance < amount:
+            raise HTTPException(status_code=400, detail="Insufficient cash balance")
+        current_user.cash_balance -= amount
+        current_user.total_withdrawn += amount
+    else:
+        raise HTTPException(status_code=400, detail="Invalid transaction type")
+    
+    # Record transaction
+    cash_txn = CashTransaction(
+        type=transaction_type,
+        amount=amount,
+        note=note,
+        user_id=current_user.id
+    )
+    
+    session.add(current_user)
+    session.add(cash_txn)
+    session.commit()
+    session.refresh(current_user)
+    
+    return {
+        "message": f"{transaction_type.capitalize()} successful",
+        "amount": amount,
+        "new_balance": current_user.cash_balance
+    }
+
+@api_router.get("/paper-trading/profit-loss")
+def get_profit_loss(
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Calculate overall profit/loss"""
+    if not current_user.paper_trading_enabled:
+        raise HTTPException(status_code=400, detail="Paper trading not enabled")
+    
+    # Get portfolio summary
+    summary = get_portfolio_summary(session, current_user)
+    portfolio_value = summary['total_value']
+    
+    # Calculate total account value (cash + portfolio)
+    total_account_value = current_user.cash_balance + portfolio_value
+    
+    # Calculate net deposits (deposits - withdrawals)
+    net_deposits = current_user.total_deposited - current_user.total_withdrawn
+    
+    # Profit/Loss = Total Account Value - Net Deposits
+    profit_loss = total_account_value - net_deposits
+    profit_loss_pct = (profit_loss / net_deposits * 100) if net_deposits > 0 else 0
+    
+    return {
+        "cash_balance": current_user.cash_balance,
+        "portfolio_value": portfolio_value,
+        "total_account_value": total_account_value,
+        "net_deposits": net_deposits,
+        "profit_loss": profit_loss,
+        "profit_loss_percentage": profit_loss_pct
+    }
+
 # --- Stock Data Endpoints (Public) ---
+
+@api_router.get("/stock/search")
+def search_ticker(q: str):
+    """
+    Search for a stock ticker by name or symbol.
+    """
+    try:
+        url = "https://query2.finance.yahoo.com/v1/finance/search"
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        params = {'q': q, 'quotesCount': 5, 'newsCount': 0}
+        
+        response = requests.get(url, headers=headers, params=params, timeout=5)
+        response.raise_for_status()
+        data = response.json()
+        
+        quotes = data.get("quotes", [])
+        results = []
+        for quote in quotes:
+            if "symbol" in quote:
+                results.append({
+                    "symbol": quote["symbol"],
+                    "shortname": quote.get("shortname", ""),
+                    "longname": quote.get("longname", ""),
+                    "exchange": quote.get("exchange", ""),
+                    "type": quote.get("quoteType", "")
+                })
+        return results
+    except Exception as e:
+        logger.error(f"Error searching for ticker: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @api_router.get("/stock/{ticker}")
 def get_stock_data(ticker: str):
@@ -248,20 +465,52 @@ def get_stock_history(ticker: str, period: str = "1mo"):
         })
     return data
 
+
 @api_router.get("/stock/{ticker}/current")
 def get_current_price(ticker: str):
     try:
         stock = yf.Ticker(ticker)
-        info = stock.info
-        price = info.get("currentPrice") or info.get("regularMarketPrice")
-        previous_close = info.get("previousClose") or info.get("regularMarketPreviousClose")
+        price = None
+        previous_close = None
         
-        # Get company name and truncate to 30 characters
-        company_name = info.get("shortName") or info.get("longName") or ticker
+        # 1. Try fast_info (Most reliable for Docker/Server environments)
+        try:
+            price = stock.fast_info.last_price
+            previous_close = stock.fast_info.previous_close
+        except Exception:
+            logger.warning(f"fast_info failed for {ticker}", exc_info=False)
+
+        # 2. Fallback to history if fast_info failed
+        if price is None:
+            try:
+                hist = stock.history(period="5d")
+                if not hist.empty:
+                    price = hist["Close"].iloc[-1]
+                    previous_close = hist["Close"].iloc[-2] if len(hist) > 1 else price
+            except Exception:
+                logger.warning(f"history fetch failed for {ticker}", exc_info=False)
+
+        # 3. Last resort: .info (often fails in Docker/Cloud)
+        if price is None:
+            try:
+                info = stock.info
+                price = info.get("currentPrice") or info.get("regularMarketPrice")
+                previous_close = info.get("previousClose") or info.get("regularMarketPreviousClose")
+            except Exception:
+                logger.warning(f"info fetch failed for {ticker}", exc_info=False)
+        
+        # Get company name (lenient) - indices often fail this
+        company_name = ticker
+        try:
+            info = stock.info
+            company_name = info.get("shortName") or info.get("longName") or ticker
+        except Exception:
+            pass # Keep default ticker name
+            
         if len(company_name) > 30:
             company_name = company_name[:27] + "..."
         
-        if price:
+        if price is not None:
             return {
                 "ticker": ticker, 
                 "price": price,
@@ -270,7 +519,10 @@ def get_current_price(ticker: str):
             }
         else:
             raise HTTPException(status_code=404, detail=f"Price not found for {ticker}")
+    except HTTPException:
+        raise
     except Exception as e:
+        logger.error(f"Error serving price for {ticker}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -308,16 +560,32 @@ def get_portfolio_summary(
     for ticker, data in holdings.items():
         if data["quantity"] > 0:
             stock = yf.Ticker(ticker)
+            current_price = 0.0
+            
+            # 1. Fetch Price (Robust)
             try:
                 current_price = stock.fast_info.last_price
+            except Exception:
+                # Fallback to history if fast_info fails
+                try:
+                     hist = stock.history(period="5d")
+                     if not hist.empty:
+                         current_price = hist["Close"].iloc[-1]
+                except Exception:
+                     pass
+
+            # 2. Fetch Company Name (Optional, often fails in Docker)
+            company_name = ticker
+            try:
                 info = stock.info
-                # Get company name and truncate to 30 characters
-                company_name = info.get("shortName") or info.get("longName") or ticker
-                if len(company_name) > 30:
-                    company_name = company_name[:27] + "..."
-            except:
-                current_price = 0.0
-                company_name = ticker
+                name_res = info.get("shortName") or info.get("longName")
+                if name_res:
+                    company_name = name_res
+            except Exception:
+                pass
+            
+            if len(company_name) > 30:
+                company_name = company_name[:27] + "..."
             
             market_value = data["quantity"] * current_price
             total_portfolio_value += market_value
@@ -361,7 +629,7 @@ async def chat_endpoint(
     total_value = summary_data['total_value']
     
     context = f"""
-    You are a helpful financial advisor assistant for a portfolio tracker app.
+    You are a helpful financial advisor assistant for NVest AI, an AI-powered portfolio tracking app.
     The user's current portfolio value is ${total_value:,.2f}.
     Current holdings: {holdings_text if holdings_text else "None"}.
     
@@ -388,7 +656,7 @@ FRONTEND_DIST = os.path.abspath(os.path.join(os.path.dirname(__file__), "../fron
 if os.path.exists(os.path.join(FRONTEND_DIST, "assets")):
     app.mount("/assets", StaticFiles(directory=os.path.join(FRONTEND_DIST, "assets")), name="assets")
 else:
-    print(f"Warning: Assets directory not found at {os.path.join(FRONTEND_DIST, 'assets')}")
+    logger.warning(f"Warning: Assets directory not found at {os.path.join(FRONTEND_DIST, 'assets')}")
 
 @app.get("/{full_path:path}")
 async def serve_spa(full_path: str):

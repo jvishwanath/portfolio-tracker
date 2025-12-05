@@ -10,6 +10,24 @@ const TransactionWizard = ({ onTransactionAdded }) => {
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState(null);
+    const [suggestions, setSuggestions] = useState([]);
+    const [showSuggestions, setShowSuggestions] = useState(false);
+
+    // Search Suggestions
+    React.useEffect(() => {
+        const timeoutId = setTimeout(async () => {
+            if (ticker && ticker.length > 1 && showSuggestions) {
+                try {
+                    const res = await axios.get(`/api/stock/search?q=${ticker}`);
+                    if (Array.isArray(res.data)) setSuggestions(res.data);
+                    else setSuggestions([]);
+                } catch (e) { setSuggestions([]); }
+            } else {
+                setSuggestions([]);
+            }
+        }, 300);
+        return () => clearTimeout(timeoutId);
+    }, [ticker, showSuggestions]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -27,11 +45,13 @@ const TransactionWizard = ({ onTransactionAdded }) => {
             setTicker('');
             setQuantity('');
             setPrice('');
+            setSuggestions([]);
             setMessage({ type: 'success', text: 'Transaction executed successfully' });
             setTimeout(() => setMessage(null), 3000);
         } catch (error) {
             console.error("Error adding transaction", error);
-            setMessage({ type: 'error', text: 'Failed to execute transaction' });
+            const errorMessage = error.response?.data?.detail || 'Failed to execute transaction';
+            setMessage({ type: 'error', text: errorMessage });
         } finally {
             setLoading(false);
         }
@@ -92,11 +112,38 @@ const TransactionWizard = ({ onTransactionAdded }) => {
                         <input
                             type="text"
                             value={ticker}
-                            onChange={(e) => setTicker(e.target.value)}
+                            onChange={(e) => { setTicker(e.target.value); setShowSuggestions(true); }}
+                            onFocus={() => setShowSuggestions(true)}
+                            onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' && showSuggestions && suggestions.length > 0) {
+                                    e.preventDefault();
+                                    setTicker(suggestions[0].symbol);
+                                    setShowSuggestions(false);
+                                }
+                            }}
                             className="w-full pl-11 pr-4 py-3.5 rounded-xl border border-gray-200 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all bg-white/50 font-bold text-gray-800 placeholder-gray-300"
                             placeholder="Ticker (e.g. AAPL)"
                             required
+                            autoComplete="off"
                         />
+                        {showSuggestions && suggestions.length > 0 && (
+                            <ul className="absolute z-50 w-full bg-white border border-gray-200 rounded-xl mt-1 max-h-60 overflow-auto shadow-xl">
+                                {suggestions.map((s, idx) => (
+                                    <li
+                                        key={idx}
+                                        onClick={() => {
+                                            setTicker(s.symbol);
+                                            setShowSuggestions(false);
+                                        }}
+                                        className="px-4 py-3 hover:bg-gray-50 cursor-pointer flex justify-between items-center border-b border-gray-50 last:border-0 transition-colors"
+                                    >
+                                        <span className="font-bold text-gray-800">{s.symbol}</span>
+                                        <span className="text-xs text-gray-500 truncate max-w-[150px]">{s.shortname || s.longname}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
                     </div>
                 </div>
 

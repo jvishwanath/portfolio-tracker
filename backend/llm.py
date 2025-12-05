@@ -1,10 +1,14 @@
 import os
 import json
+import logging
 from typing import Optional
 from google import genai
 from google.genai import types
 from openai import OpenAI
 from ddgs import DDGS
+
+
+logger = logging.getLogger(__name__)
 
 class LLMService:
     def __init__(self):
@@ -18,13 +22,13 @@ class LLMService:
             try:
                 self.gemini_client = genai.Client(api_key=self.gemini_key)
             except Exception as e:
-                print(f"Failed to initialize Gemini client: {e}")
+                logger.error(f"Failed to initialize Gemini client: {e}")
                 
         if self.openai_key:
             try:
                 self.openai_client = OpenAI(api_key=self.openai_key)
             except Exception as e:
-                print(f"Failed to initialize OpenAI client: {e}")
+                logger.error(f"Failed to initialize OpenAI client: {e}")
 
     async def generate_response(self, context: str, user_query: str, access_token: Optional[str] = None) -> str:
         # Prioritize OpenAI for stability (simple ddgs, no MCP complexity)
@@ -38,21 +42,21 @@ class LLMService:
     async def _generate_gemini(self, context: str, user_query: str, access_token: Optional[str] = None) -> str:
         """Generate response using Gemini with Google Search grounding."""
         try:
-            print("[Gemini] Calling Gemini with Google Search...")
+            logger.info("[Gemini] Calling Gemini with Google Search...")
             
             # Use Google Search grounding (built-in to Gemini)
             grounding_tool = types.Tool(google_search=types.GoogleSearch())
             config = types.GenerateContentConfig(tools=[grounding_tool])
             
             response = self.gemini_client.models.generate_content(
-                model="gemini-2.0-flash-exp",
+                model="gemini-2.0-flash-lite",
                 contents=f"{context}\n\nUser Question: {user_query}",
                 config=config
             )
             
             # Extract text from response
             if hasattr(response, 'text') and response.text:
-                print("[Gemini] Success")
+                logger.info("[Gemini] Success")
                 return response.text
             
             # Try to extract from candidates
@@ -62,18 +66,18 @@ class LLMService:
                         if hasattr(candidate.content, 'parts') and candidate.content.parts:
                             for part in candidate.content.parts:
                                 if hasattr(part, 'text') and part.text:
-                                    print("[Gemini] Success (from parts)")
+                                    logger.info("[Gemini] Success (from parts)")
                                     return part.text
             
-            print("[Gemini] Empty response, falling back to OpenAI")
+            logger.info("[Gemini] Empty response, falling back to OpenAI")
             if self.openai_client:
                 return self._generate_openai(context, user_query)
             return "I apologize, but I couldn't generate a response."
                 
         except Exception as e:
-            print(f"[Gemini] Error: {e}")
+            logger.error(f"[Gemini] Error: {e}")
             if self.openai_client:
-                print("[Gemini] Falling back to OpenAI...")
+                logger.info("[Gemini] Falling back to OpenAI...")
                 return self._generate_openai(context, user_query)
             return f"Error communicating with AI: {str(e)}"
 
@@ -263,7 +267,7 @@ class LLMService:
                     function_name = tool_call.function.name
                     function_args = json.loads(tool_call.function.arguments)
                     
-                    print(f"[OpenAI] Calling tool: {function_name} with {function_args}")
+                    logger.info(f"[OpenAI] Calling tool: {function_name} with {function_args}")
                     
                     if function_name == "web_search":
                         search_query = function_args.get("query")

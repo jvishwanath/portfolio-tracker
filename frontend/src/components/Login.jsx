@@ -29,7 +29,13 @@ const Login = () => {
         <Container className="d-flex align-items-center justify-content-center" style={{ minHeight: '100vh' }}>
             <Card style={{ width: '400px' }} className="shadow">
                 <Card.Body>
-                    <h2 className="text-center mb-4">Portfolio Tracker</h2>
+                    <div className="text-center mb-4">
+                        <img
+                            src="/logo.png"
+                            alt="NVest AI Logo"
+                            style={{ height: '120px' }}
+                        />
+                    </div>
                     {error && <Alert variant="danger">{error}</Alert>}
 
                     <Tabs

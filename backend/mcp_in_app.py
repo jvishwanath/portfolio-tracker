@@ -20,7 +20,7 @@ class InAppMCPClient:
         
         Args:
             access_token: User's JWT access token from their session
-            api_base_url: Base URL of the portfolio tracker API (defaults to PORT env var)
+            api_base_url: Base URL of the NVest AI API (defaults to PORT env var)
         """
         if api_base_url is None:
             port = os.getenv("PORT", "8080")

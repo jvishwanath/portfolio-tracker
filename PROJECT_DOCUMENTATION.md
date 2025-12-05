@@ -1,4 +1,4 @@
-# Portfolio Tracker - Complete Project Documentation
+# NVest AI - Complete Project Documentation
 
 ## Table of Contents
 
@@ -74,7 +74,7 @@ A full-stack web application for tracking stock portfolios with real-time market
 
 ## MCP Server Integration
 
-This project implements the **Model Context Protocol (MCP)** to allow AI assistants to interact with the portfolio tracker application through natural language.
+This project implements the **Model Context Protocol (MCP)** to allow AI assistants to interact with the NVest AI application through natural language.
 
 ### What is MCP?
 
@@ -282,4 +282,4 @@ jobs:
 
 ---
 
-**🎉 Enjoy using your AI-powered Portfolio Tracker!**
+**🎉 Enjoy using NVest AI!**

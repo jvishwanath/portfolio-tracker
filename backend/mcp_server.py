@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Portfolio Tracker MCP Server
+NVest AI MCP Server
 
 This MCP server provides tools for managing a stock portfolio through natural language.
-It connects to the Portfolio Tracker FastAPI backend.
+It connects to the NVest AI FastAPI backend.
 """
 
 import asyncio
@@ -23,9 +23,10 @@ import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # Configure logging
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 logging.basicConfig(
     filename='mcp_server.log',
-    level=logging.DEBUG,
+    level=getattr(logging, LOG_LEVEL, logging.INFO),
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
@@ -43,7 +44,7 @@ client = httpx.AsyncClient(timeout=30.0)
 
 
 async def authenticate() -> str:
-    """Authenticate with the portfolio tracker API and return access token."""
+    """Authenticate with the NVest AI API and return access token."""
     global access_token
     
     if ACCESS_TOKEN:

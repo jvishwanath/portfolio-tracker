@@ -5,7 +5,7 @@ from typing import Optional
 from google import genai
 from google.genai import types
 from openai import OpenAI
-from ddgs import DDGS
+from duckduckgo_search import DDGS
 
 
 logger = logging.getLogger(__name__)

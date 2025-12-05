@@ -123,39 +123,34 @@ const Watchlist = ({ onSelectStock }) => {
                         <ListGroup.Item
                             key={item.id}
                             onClick={() => onSelectStock(item.ticker)}
-                            className="d-flex justify-content-between align-items-center py-2 px-2"
+                            className="d-flex justify-content-between align-items-center py-1 px-2"
                             style={{ cursor: 'pointer', borderLeft: 'none', borderRight: 'none' }}
                         >
-                            <div className="d-flex align-items-center gap-2 flex-grow-1">
-                                <div className="d-flex flex-column" style={{ minWidth: '120px' }}>
-                                    <span className="fw-bold" style={{ fontSize: '0.75rem' }}>
-                                        {item.ticker}
-                                    </span>
-                                    {data.company_name && (
-                                        <small className="text-muted" style={{ fontSize: '0.65rem', lineHeight: '1' }}>
-                                            {data.company_name}
-                                        </small>
-                                    )}
-                                </div>
-                                {data.price > 0 ? (
+                            <div className="d-flex align-items-center gap-3 flex-grow-1">
+                                <span className="fw-bold" style={{ fontSize: '0.85rem', minWidth: '60px' }}>
+                                    {item.ticker}
+                                </span>
+
+                                {data.price > 0 && (
                                     <>
-                                        <span className={isPositive ? 'text-success' : 'text-danger'} style={{ fontSize: '0.7rem' }}>
-                                            {isPositive ? '+' : ''}${Math.abs(change).toFixed(2)}
+                                        <span className="fw-bold" style={{ fontSize: '0.85rem', minWidth: '70px' }}>
+                                            ${data.price.toFixed(2)}
                                         </span>
-                                        <span className={isPositive ? 'text-success' : 'text-danger'} style={{ fontSize: '0.7rem' }}>
-                                            ({isPositive ? '+' : ''}{changePercent.toFixed(2)}%)
+                                        <span className={isPositive ? 'text-success' : 'text-danger'} style={{ fontSize: '0.75rem', minWidth: '80px' }}>
+                                            {isPositive ? '+' : ''}{changePercent.toFixed(2)}%
                                         </span>
                                     </>
-                                ) : (
-                                    <span className="text-muted" style={{ fontSize: '0.7rem' }}>Loading...</span>
                                 )}
-                                <span className="fw-bold ms-auto" style={{ fontSize: '0.8rem' }}>
-                                    {data.price > 0 ? `$${data.price.toFixed(2)}` : '-'}
-                                </span>
+
+                                {data.company_name && (
+                                    <small className="text-muted text-truncate" style={{ fontSize: '0.7rem', maxWidth: '200px' }}>
+                                        {data.company_name}
+                                    </small>
+                                )}
                             </div>
                             <Button
                                 variant="link"
-                                className="text-danger p-0 ms-2"
+                                className="text-danger p-0"
                                 onClick={(e) => handleRemove(item.id, e)}
                                 style={{ minWidth: 'auto' }}
                             >

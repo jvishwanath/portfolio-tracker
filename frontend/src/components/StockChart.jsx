@@ -56,7 +56,20 @@ const StockChart = ({ ticker, onClose }) => {
                     {priceChange && (
                         <div className={`fw-bold ${priceChange.value >= 0 ? 'text-success' : 'text-danger'}`}>
                             {priceChange.value >= 0 ? '+' : ''}{priceChange.value.toFixed(2)} ({priceChange.value >= 0 ? '+' : ''}{priceChange.percent.toFixed(2)}%)
-                            <span className="text-muted ms-2 fw-normal">Past {period === '1d' ? 'Day' : period === '5d' ? 'Week' : 'Month'}</span>
+                            <span className="text-muted ms-2 fw-normal">Past {
+                                {
+                                    '1d': 'Day',
+                                    '5d': 'Week',
+                                    '1mo': 'Month',
+                                    '3mo': '3 Months',
+                                    '6mo': '6 Months',
+                                    '1y': 'Year',
+                                    '2y': '2 Years',
+                                    '5y': '5 Years',
+                                    'ytd': 'Year to Date',
+                                    'max': 'Max'
+                                }[period] || period
+                            }</span>
                         </div>
                     )}
                 </div>

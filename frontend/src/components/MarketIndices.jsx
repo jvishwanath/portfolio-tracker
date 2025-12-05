@@ -18,7 +18,9 @@ const MarketIndices = () => {
     ];
 
     const fetchIndices = async () => {
-        setLoading(true);
+        // Don't set loading to true if we have data (background update)
+        if (Object.keys(indices).length === 0) setLoading(true);
+
         const results = {};
 
         for (const symbol of symbols) {
@@ -35,11 +37,21 @@ const MarketIndices = () => {
         }
 
         setIndices(results);
+        localStorage.setItem('market_indices', JSON.stringify(results));
         setLastUpdated(new Date());
         setLoading(false);
     };
 
     useEffect(() => {
+        // Load cache
+        const cached = localStorage.getItem('market_indices');
+        if (cached) {
+            try {
+                setIndices(JSON.parse(cached));
+                setLoading(false);
+            } catch (e) { }
+        }
+
         fetchIndices();
 
         // Refresh every 5 minutes

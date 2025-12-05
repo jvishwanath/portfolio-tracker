@@ -4,7 +4,7 @@ import { Modal, Button, Form, InputGroup } from 'react-bootstrap';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
-const ChatWidget = ({ show, onHide, onTransactionComplete }) => {
+const ChatWidget = ({ show, onHide, onTransactionComplete, theme }) => {
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState('');
     const [loading, setLoading] = useState(false);
@@ -76,7 +76,7 @@ const ChatWidget = ({ show, onHide, onTransactionComplete }) => {
                             <div
                                 className={`px-3 py-2 rounded ${msg.sender === 'user'
                                     ? 'bg-primary text-white'
-                                    : 'bg-light text-dark border'
+                                    : (theme === 'dark' ? 'bg-secondary text-white' : 'bg-light text-dark border')
                                     }`}
                                 style={{ maxWidth: '75%' }}
                             >
@@ -101,7 +101,7 @@ const ChatWidget = ({ show, onHide, onTransactionComplete }) => {
                     ))}
                     {loading && (
                         <div className="d-flex justify-content-start mb-3">
-                            <div className="bg-light text-dark border px-3 py-2 rounded">
+                            <div className={`${theme === 'dark' ? 'bg-secondary text-white' : 'bg-light text-dark border'} px-3 py-2 rounded`}>
                                 <div className="spinner-border spinner-border-sm me-2" role="status">
                                     <span className="visually-hidden">Loading...</span>
                                 </div>

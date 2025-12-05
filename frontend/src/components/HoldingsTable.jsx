@@ -14,7 +14,19 @@ const HoldingsTable = ({ holdings, onSelectStock, selectedTicker, onBuy, onSell,
     };
 
     const sortedHoldings = useMemo(() => {
-        let sortableItems = [...holdings];
+        // Normalize data first to handle backend key changes
+        const normalizedItems = holdings.map(h => {
+            const avgCost = h.avg_cost !== undefined ? h.avg_cost : (h.average_cost || 0);
+            const costBasis = avgCost * h.quantity;
+            return {
+                ...h,
+                company_name: h.name || h.company_name || h.ticker,
+                average_cost: avgCost,
+                gain_loss: h.market_value - costBasis
+            };
+        });
+
+        let sortableItems = [...normalizedItems];
         if (sortConfig.key) {
             sortableItems.sort((a, b) => {
                 if (a[sortConfig.key] < b[sortConfig.key]) {

@@ -7,6 +7,9 @@ from models import Transaction, Watchlist, User, CashTransaction
 import yfinance as yf
 from typing import List, Dict
 from dotenv import load_dotenv
+import os
+import json
+from datetime import datetime
 from auth import (
     get_password_hash, 
     verify_password, 
@@ -401,13 +404,22 @@ def get_profit_loss(
     profit_loss = total_account_value - net_deposits
     profit_loss_pct = (profit_loss / net_deposits * 100) if net_deposits > 0 else 0
     
+    # Calculate Unrealized P/L (Current Value of Holdings - Cost Basis of Holdings)
+    # total_cost_basis is now returned by get_portfolio_summary
+    unrealized_pl = portfolio_value - summary.get('total_cost_basis', 0.0)
+    
+    # Calculate Realized P/L (Total P/L - Unrealized P/L)
+    realized_pl = profit_loss - unrealized_pl
+
     return {
         "cash_balance": current_user.cash_balance,
         "portfolio_value": portfolio_value,
         "total_account_value": total_account_value,
         "net_deposits": net_deposits,
         "profit_loss": profit_loss,
-        "profit_loss_percentage": profit_loss_pct
+        "profit_loss_percentage": profit_loss_pct,
+        "unrealized_pl": unrealized_pl,
+        "realized_pl": realized_pl
     }
 
 # --- Stock Data Endpoints (Public) ---
@@ -526,6 +538,150 @@ def get_current_price(ticker: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@api_router.get("/stock/{ticker}/info")
+def get_stock_info(ticker: str):
+    """
+    Get comprehensive stock information for research.
+    """
+    try:
+        stock = yf.Ticker(ticker)
+        info = stock.info
+        
+        # Extract key metrics
+        return {
+            "symbol": ticker.upper(),
+            "name": info.get("longName") or info.get("shortName") or ticker,
+            "sector": info.get("sector"),
+            "industry": info.get("industry"),
+            "description": info.get("longBusinessSummary"),
+            "website": info.get("website"),
+            "current_price": info.get("currentPrice") or info.get("regularMarketPrice"),
+            "previous_close": info.get("previousClose"),
+            "market_cap": info.get("marketCap"),
+            "pe_ratio": info.get("trailingPE"),
+            "forward_pe": info.get("forwardPE"),
+            "dividend_yield": info.get("dividendYield"),
+            "fifty_two_week_high": info.get("fiftyTwoWeekHigh"),
+            "fifty_two_week_low": info.get("fiftyTwoWeekLow"),
+            "volume": info.get("volume"),
+            "avg_volume": info.get("averageVolume"),
+            "beta": info.get("beta"),
+            "eps": info.get("trailingEps"),
+            "revenue": info.get("totalRevenue"),
+            "profit_margin": info.get("profitMargins"),
+        }
+    except Exception as e:
+        logger.error(f"Error fetching info for {ticker}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch stock info: {str(e)}")
+
+
+@api_router.get("/stock/{ticker}/news")
+def get_stock_news(ticker: str):
+    """
+    Get top news articles for a stock using DuckDuckGo Search.
+    """
+    try:
+        # Get company name for better search
+        stock = yf.Ticker(ticker)
+        name = stock.info.get("shortName") or ticker
+        
+        # 1. Try Gemini with Google Search
+        gemini_key = os.getenv("GEMINI_API_KEY")
+        if gemini_key:
+            try:
+                from google import genai
+                from google.genai import types
+                
+                client = genai.Client(api_key=gemini_key)
+                tools = [types.Tool(google_search=types.GoogleSearch())]
+                
+                prompt = f"""
+                Find 5 latest news articles about {ticker} ({name}) stock.
+                Return a JSON array of objects. Each object must have:
+                - "title": Article title
+                - "source": Publisher name
+                - "date": Publication date (e.g. YYYY-MM-DD or relative)
+                - "url": Direct link to the article
+                
+                IMPORTANT: Return ONLY raw JSON. Do not use markdown code blocks like ```json.
+                """
+                
+                # Use text generation with search tool
+                response = client.models.generate_content(
+                    model="gemini-2.0-flash-lite", 
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        tools=tools,
+                        response_mime_type="application/json"
+                    )
+                )
+                
+                if response.text:
+                    text = response.text.strip()
+                    # Cleanup markdown if present despite instructions
+                    if text.startswith("```json"):
+                        text = text[7:]
+                    if text.startswith("```"):
+                        text = text[3:]
+                    if text.endswith("```"):
+                        text = text[:-3]
+                    
+                    data = json.loads(text.strip())
+                    articles = []
+                    for item in data:
+                        articles.append({
+                            "title": item.get("title"),
+                            "publisher": item.get("source"),
+                            "link": item.get("url"),
+                            "published_at": item.get("date"),
+                            "thumbnail": None 
+                        })
+                    if articles:
+                        return {"articles": articles}
+            except Exception as e:
+                logger.error(f"Gemini news fetch failed: {e}")
+
+        # 2. Fallback to DuckDuckGo
+        # Construct query
+        query = f"latest news about {name} {ticker} stock"
+        
+        # Search using DDGS
+        from duckduckgo_search import DDGS
+        results = list(DDGS().news(keywords=query, max_results=10))
+        
+        # Format news articles
+        articles = []
+        for item in results:
+            articles.append({
+                "title": item.get("title"),
+                "publisher": item.get("source"),
+                "link": item.get("url"),
+                "published_at": item.get("date"), # ISO string
+                "thumbnail": item.get("image"),
+            })
+        
+        return {"articles": articles}
+    except Exception as e:
+        logger.error(f"Error fetching news for {ticker}: {e}")
+        # Fallback to yfinance if DDGS fails
+        try:
+            logger.info("Falling back to yfinance for news")
+            stock = yf.Ticker(ticker)
+            news = stock.news
+            articles = []
+            for item in news[:10]:
+                articles.append({
+                    "title": item.get("title"),
+                    "publisher": item.get("publisher"),
+                    "link": item.get("link"),
+                    "published_at": item.get("providerPublishTime"), # Timestamp
+                    "thumbnail": item.get("thumbnail", {}).get("resolutions", [{}])[0].get("url") if item.get("thumbnail") else None,
+                })
+            return {"articles": articles}
+        except Exception as yf_e:
+            raise HTTPException(status_code=500, detail=f"Failed to fetch news: {str(e)}")
+
+
 @api_router.get("/portfolio/summary")
 def get_portfolio_summary(
     session: Session = Depends(get_session),
@@ -556,6 +712,7 @@ def get_portfolio_summary(
     
     summary = []
     total_portfolio_value = 0.0
+    total_cost_basis = 0.0
     
     for ticker, data in holdings.items():
         if data["quantity"] > 0:
@@ -589,18 +746,23 @@ def get_portfolio_summary(
             
             market_value = data["quantity"] * current_price
             total_portfolio_value += market_value
+            total_cost_basis += data["total_cost"]
             
             summary.append({
                 "ticker": ticker,
-                "company_name": company_name,
+                "name": company_name,
                 "quantity": data["quantity"],
-                "average_cost": data["total_cost"] / data["quantity"] if data["quantity"] > 0 else 0,
+                "avg_cost": data["total_cost"] / data["quantity"] if data["quantity"] > 0 else 0,
                 "current_price": current_price,
                 "market_value": market_value,
-                "gain_loss": market_value - data["total_cost"]
+                "return_pct": ((current_price - (data["total_cost"] / data["quantity"])) / (data["total_cost"] / data["quantity"])) * 100 if data["total_cost"] > 0 else 0
             })
             
-    return {"holdings": summary, "total_value": total_portfolio_value}
+    return {
+        "holdings": summary, 
+        "total_value": total_portfolio_value,
+        "total_cost_basis": total_cost_basis
+    }
 
 # --- Chatbot Endpoint ---
 
@@ -630,7 +792,9 @@ async def chat_endpoint(
     
     
     # Build context with paper trading info if enabled
+    current_date = datetime.now().strftime("%A, %B %d, %Y")
     context_parts = [
+        f"Today is {current_date}.",
         "You are a helpful financial advisor assistant for NVest AI, an AI-powered portfolio tracking app.",
     ]
     

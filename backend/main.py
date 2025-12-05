@@ -292,8 +292,8 @@ def enable_paper_trading(
     current_user: User = Depends(get_current_user)
 ):
     """Enable paper trading for user with initial deposit"""
-    if current_user.paper_trading_enabled:
-        raise HTTPException(status_code=400, detail="Paper trading already enabled")
+    """Enable paper trading for user with initial deposit"""
+    # Removed "already enabled" check to allow resetting portfolio via this endpoint
     
     # Wipe existing data to start fresh
     session.exec(delete(Transaction).where(Transaction.user_id == current_user.id))

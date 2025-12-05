@@ -6,6 +6,8 @@ const Sidebar = ({ theme, collapsed, toggleTheme, logout, user, setShowChat }) =
     const location = useLocation();
     const activeKey = location.pathname;
 
+
+
     const linkStyle = {
         color: theme === 'dark' ? '#e0e0e0' : '#333',
         padding: '12px 20px',
@@ -107,10 +109,12 @@ const Sidebar = ({ theme, collapsed, toggleTheme, logout, user, setShowChat }) =
             <div className="mt-auto px-2 pb-3">
                 <hr style={{ borderColor: theme === 'dark' ? '#444' : '#eee' }} />
 
-                {/* User Profile (Static for now) */}
-                <div
-                    style={{ ...linkStyle, cursor: 'default', opacity: 0.8 }}
-                    title={collapsed ? (user?.email && user.email.startsWith('guest_') ? 'Guest User' : user?.email) : ""}
+                {/* User Profile Link */}
+                <Link
+                    to="/profile"
+                    style={{ ...linkStyle, opacity: 0.8 }}
+                    className="sidebar-link"
+                    title={collapsed ? "User Profile" : ""}
                 >
                     <i className={`bi bi-person-circle ${collapsed ? '' : 'me-3'}`} style={{ fontSize: '1.2rem' }}></i>
                     {!collapsed && (
@@ -118,7 +122,7 @@ const Sidebar = ({ theme, collapsed, toggleTheme, logout, user, setShowChat }) =
                             {user?.email && user.email.startsWith('guest_') ? 'Guest User' : user?.email}
                         </span>
                     )}
-                </div>
+                </Link>
 
                 {/* Theme Toggle */}
                 <button

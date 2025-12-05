@@ -6,6 +6,7 @@ import Login from './components/Login';
 import Dashboard from './pages/Dashboard';
 import WatchlistPage from './pages/WatchlistPage';
 import ResearchPage from './pages/ResearchPage';
+import UserProfile from './pages/UserProfile';
 import './App.css';
 import { AuthProvider, useAuth } from './context/AuthContext';
 
@@ -93,6 +94,7 @@ function MainApp() {
           logout={logout}
           user={user}
           setShowChat={setShowChat}
+          onRefresh={handleTransactionComplete}
         />
 
         {/* Main Content Area */}
@@ -153,6 +155,7 @@ function MainApp() {
               />
               <Route path="/watchlist" element={<WatchlistPage />} />
               <Route path="/research" element={<ResearchPage theme={theme} />} />
+              <Route path="/profile" element={<UserProfile user={user} theme={theme} />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </div>

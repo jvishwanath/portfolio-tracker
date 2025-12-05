@@ -628,14 +628,28 @@ async def chat_endpoint(
     holdings_text = ", ".join([f"{h['ticker']} ({h['quantity']} shares)" for h in summary_data['holdings'] if h['quantity'] > 0])
     total_value = summary_data['total_value']
     
-    context = f"""
-    You are a helpful financial advisor assistant for NVest AI, an AI-powered portfolio tracking app.
-    The user's current portfolio value is ${total_value:,.2f}.
-    Current holdings: {holdings_text if holdings_text else "None"}.
     
-    Provide insights based on the user's portfolio and market trends.
-    Keep answers short, concise and helpful.
-    """
+    # Build context with paper trading info if enabled
+    context_parts = [
+        "You are a helpful financial advisor assistant for NVest AI, an AI-powered portfolio tracking app.",
+    ]
+    
+    if current_user.paper_trading_enabled:
+        context_parts.append(f"The user is using Virtual Trading mode (practice with virtual money).")
+        context_parts.append(f"Cash Balance: ${current_user.cash_balance:,.2f}")
+        context_parts.append(f"Portfolio Value (stocks): ${total_value:,.2f}")
+        total_account = current_user.cash_balance + total_value
+        context_parts.append(f"Total Account Value: ${total_account:,.2f}")
+    else:
+        context_parts.append(f"The user's portfolio value is ${total_value:,.2f}.")
+    
+    context_parts.append(f"Current holdings: {holdings_text if holdings_text else 'None'}.")
+    context_parts.append("")
+    context_parts.append("Provide insights based on the user's portfolio and market trends.")
+    context_parts.append("Keep answers short, concise and helpful.")
+    
+    context = "\n".join(context_parts)
+    
     
     try:
         response_text = await llm_service.generate_response(context, user_query, access_token)
